@@ -21,6 +21,7 @@ Parquet is the **industry-standard columnar format** that delivers:
 | 🔧 **Compatibility** | Works with Spark, DuckDB, Pandas, Arrow, Snowflake |
 | 📊 **Analytics** | Optimized for column-based queries |
 | ⚡ **Speed** | 0.15s read, 0.46s write for 1M records |
+| 📝 **Extensions** | Supports both `.parquet` and `.pk` (shorter alternative) |
 
 Full benchmark: [Performance Comparison](https://github.com/parf/homebase-go-lib/blob/main/benchmarks/serialization-benchmark-result.md)
 
@@ -52,12 +53,12 @@ go build -o any2parquet main.go
 # Convert JSONL to Parquet
 any2parquet data.jsonl                  # → data.parquet
 
-# Convert CSV to Parquet
-any2parquet users.csv output.parquet    # → output.parquet
+# Convert CSV to Parquet (use .pk for shorter extension)
+any2parquet users.csv output.pk         # → output.pk
 
 # Convert compressed files (auto-detect)
 any2parquet logs.jsonl.gz              # → logs.parquet
-any2parquet metrics.csv.zst            # → metrics.parquet
+any2parquet metrics.csv.zst            # → metrics.pk
 ```
 
 ### Advanced Usage
@@ -65,10 +66,10 @@ any2parquet metrics.csv.zst            # → metrics.parquet
 ```bash
 # Add extra compression (optional)
 any2parquet data.jsonl data.parquet.zst        # Parquet + Zstandard
-any2parquet data.msgpack data.parquet.lz4      # Parquet + LZ4
+any2parquet data.msgpack data.pk.lz4           # Parquet + LZ4 (.pk extension)
 
-# Custom output name
-any2parquet input.csv output_name.parquet
+# Custom output name (supports both .parquet and .pk extensions)
+any2parquet input.csv output_name.pk
 ```
 
 > ⚠️ **Note:** Parquet has built-in Snappy compression. Additional compression (.zst/.lz4/.gz) provides only ~10-15% size reduction with slower access times.
