@@ -2,14 +2,12 @@ module github.com/parf/any-to-parquet
 
 go 1.25.6
 
-require (
-	github.com/apache/arrow/go/v14 v14.0.2
-	github.com/parf/homebase-go-lib v0.0.0-20260129023943-a1a04af7706e
-)
+require github.com/parf/homebase-go-lib v0.0.0-20260129024720-8b99f6e12ced
 
 require (
 	github.com/JohnCGriffin/overflow v0.0.0-20211019200055-46fa312c352c // indirect
 	github.com/andybalholm/brotli v1.2.0 // indirect
+	github.com/apache/arrow/go/v14 v14.0.2 // indirect
 	github.com/apache/thrift v0.17.0 // indirect
 	github.com/edsrzf/mmap-go v1.2.0 // indirect
 	github.com/goccy/go-json v0.10.2 // indirect
