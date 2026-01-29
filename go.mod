@@ -2,7 +2,7 @@ module github.com/parf/any-to-parquet
 
 go 1.25.6
 
-require github.com/parf/homebase-go-lib v0.0.0-20260129024720-8b99f6e12ced
+require github.com/parf/homebase-go-lib v0.0.0-20260129025330-3f360ce294b2
 
 require (
 	github.com/JohnCGriffin/overflow v0.0.0-20211019200055-46fa312c352c // indirect
