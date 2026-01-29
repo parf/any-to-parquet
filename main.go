@@ -23,8 +23,7 @@ func main() {
 		fmt.Fprintf(os.Stderr, "Supported input formats (recognized extension → format):\n")
 		fmt.Fprintf(os.Stderr, "  - JSONL: JSON Lines, one JSON object per line → .jsonl\n")
 		fmt.Fprintf(os.Stderr, "  - CSV: Comma-separated values with header row → .csv, .tsv, .psv\n")
-		fmt.Fprintf(os.Stderr, "  - MsgPack: Binary serialization format → .msgpack\n")
-		fmt.Fprintf(os.Stderr, "  - FlatBuffer: Zero-copy binary format → .fb\n\n")
+		fmt.Fprintf(os.Stderr, "  - MsgPack: Binary serialization format → .msgpack\n\n")
 
 		fmt.Fprintf(os.Stderr, "Input compression formats (recognized extension → format):\n")
 		fmt.Fprintf(os.Stderr, "  .gz  → Gzip (standard compression, widely supported, slow)\n")
@@ -86,7 +85,7 @@ func main() {
 		for _, ext := range []string{".gz", ".zst", ".lz4", ".br", ".xz"} {
 			outputFile = strings.TrimSuffix(outputFile, ext)
 		}
-		for _, ext := range []string{".jsonl", ".csv", ".msgpack", ".fb"} {
+		for _, ext := range []string{".jsonl", ".csv", ".msgpack"} {
 			outputFile = strings.TrimSuffix(outputFile, ext)
 		}
 		outputFile += ".parquet"
@@ -117,9 +116,7 @@ func main() {
 func readInput(filename string) ([]map[string]any, error) {
 	lower := strings.ToLower(filename)
 
-	if strings.Contains(lower, ".fb") {
-		return readFlatBuffer(filename)
-	} else if strings.Contains(lower, ".msgpack") {
+	if strings.Contains(lower, ".msgpack") {
 		return readMsgPack(filename)
 	} else if strings.Contains(lower, ".csv") {
 		return readCSV(filename)
@@ -218,15 +215,6 @@ func readMsgPack(filename string) ([]map[string]any, error) {
 			records = append(records, m)
 		}
 		return nil
-	})
-	return records, err
-}
-
-func readFlatBuffer(filename string) ([]map[string]any, error) {
-	var records []map[string]any
-	err := fileiterator.IterateFlatBufferList(filename, func(data []byte) error {
-		// Note: Simplified - would need full FlatBuffer parsing with generated code
-		return fmt.Errorf("FlatBuffer reading not yet fully implemented - use JSONL, CSV, or MsgPack instead")
 	})
 	return records, err
 }
