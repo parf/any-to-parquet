@@ -222,7 +222,9 @@ MIT License - see [LICENSE](LICENSE) file for details
 
 ## ⭐ Star History
 
-If you find this tool useful, please consider giving it a star! ⭐
+If you find this tool useful, please consider [giving it a star](https://github.com/parf/any-to-parquet/stargazers)! ⭐
+
+[![Star History Chart](https://api.star-history.com/svg?repos=parf/any-to-parquet&type=Date)](https://star-history.com/#parf/any-to-parquet&Date)
 
 ---
 
