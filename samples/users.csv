@@ -1,0 +1,6 @@
+user_id,username,email,age,premium,credits,country
+1001,alice_smith,alice@example.com,28,true,150.50,USA
+1002,bob_jones,bob@example.com,34,false,25.00,Canada
+1003,carol_white,carol@example.com,45,true,275.75,UK
+1004,dave_brown,dave@example.com,22,false,10.00,Australia
+1005,eve_davis,eve@example.com,31,true,500.00,Germany

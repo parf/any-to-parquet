@@ -1,0 +1,5 @@
+{"sensor_id":"temp-01","location":"server-room","temperature":22.5,"humidity":45,"online":true,"last_reading":1640995200}
+{"sensor_id":"temp-02","location":"warehouse","temperature":18.3,"humidity":52,"online":true,"last_reading":1640995200}
+{"sensor_id":"motion-01","location":"entrance","detections":142,"battery":87,"online":true,"last_reading":1640995200}
+{"sensor_id":"temp-03","location":"office","temperature":21.8,"humidity":48,"online":false,"last_reading":1640991600}
+{"sensor_id":"motion-02","location":"parking","detections":58,"battery":92,"online":true,"last_reading":1640995200}

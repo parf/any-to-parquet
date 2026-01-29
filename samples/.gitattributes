@@ -1,0 +1,4 @@
+*.parquet binary
+*.parquet.zst binary
+*.gz binary
+*.zst binary

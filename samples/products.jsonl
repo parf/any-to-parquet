@@ -1,0 +1,5 @@
+{"id":1,"product":"Laptop Pro 15","category":"Electronics","price":1299.99,"in_stock":true,"quantity":25,"rating":4.7}
+{"id":2,"product":"Wireless Mouse","category":"Accessories","price":29.99,"in_stock":true,"quantity":150,"rating":4.5}
+{"id":3,"product":"Mechanical Keyboard","category":"Accessories","price":89.99,"in_stock":false,"quantity":0,"rating":4.8}
+{"id":4,"product":"4K Monitor","category":"Electronics","price":549.99,"in_stock":true,"quantity":12,"rating":4.6}
+{"id":5,"product":"USB-C Hub","category":"Accessories","price":45.99,"in_stock":true,"quantity":78,"rating":4.3}
