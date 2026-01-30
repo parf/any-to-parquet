@@ -4,9 +4,9 @@
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![GitHub Stars](https://img.shields.io/github/stars/parf/any-to-parquet?style=social)](https://github.com/parf/any-to-parquet/stargazers)
 
-**Lightning-fast universal data converter** | Transform JSONL, CSV, MsgPack → Apache Parquet with automatic compression detection
+**Lightning-fast universal data converter** | Transform JSONL, CSV, MsgPack, SQL databases → Apache Parquet with automatic compression detection
 
-Convert any structured data format to Apache Parquet in seconds. Perfect for data pipelines, ETL workflows, analytics, and big data processing with Spark, DuckDB, Pandas, and Arrow.
+Convert any structured data format to Apache Parquet in seconds. Export from MySQL/PostgreSQL databases. Import to databases. Perfect for data pipelines, ETL workflows, analytics, and big data processing with Spark, DuckDB, Pandas, and Arrow.
 
 ---
 
@@ -35,30 +35,73 @@ Full benchmark: [Performance Comparison](https://github.com/parf/homebase-go-lib
 go install github.com/parf/any-to-parquet@latest
 ```
 
+This installs both `any2parquet` and `parquet2db` utilities.
+
 ### Build from Source
 
 ```bash
 git clone https://github.com/parf/any-to-parquet.git
 cd any-to-parquet
 go build -o any2parquet main.go
+go build -o parquet2db parquet2db.go
+```
+
+### Test Installation
+
+```bash
+# Run automated tests
+./test.sh
+
+# Quick smoke test
+any2parquet samples/products.jsonl test.parquet
+parquet2db --dsn="your-db-connection" test.parquet test_table
 ```
 
 ---
 
 ## 🚀 Quick Start
 
-### Basic Usage
+### File Conversion
 
 ```bash
 # Convert JSONL to Parquet
 any2parquet data.jsonl                  # → data.parquet
 
-# Convert CSV to Parquet (use .pk for shorter extension)
-any2parquet users.csv output.pk         # → output.pk
+# Convert CSV to Parquet
+any2parquet users.csv users.parquet
 
 # Convert compressed files (auto-detect)
 any2parquet logs.jsonl.gz              # → logs.parquet
-any2parquet metrics.csv.zst            # → metrics.pk
+any2parquet metrics.csv.zst            # → metrics.parquet
+
+# Output to stdout
+any2parquet data.csv - | duckdb
+```
+
+### SQL Database Export
+
+```bash
+# Export from MySQL
+any2parquet --dsn="user:pass@localhost" --sql="SELECT * FROM users" users.parquet
+
+# Export from PostgreSQL
+any2parquet --driver=postgre --dsn="user:pass@host" --table="public.orders" orders.parquet
+
+# Export to stdout and pipe
+any2parquet --dsn="root:pass@localhost" --sql="SELECT * FROM logs LIMIT 100" - | head
+```
+
+### Database Import
+
+```bash
+# Import Parquet to MySQL
+parquet2db --dsn="root:pass@localhost/mydb" users.parquet users_table
+
+# Import to PostgreSQL
+parquet2db --driver=postgre --dsn="user:pass@host/mydb" orders.parquet public.orders
+
+# Automatic schema creation and batch inserts
+parquet2db --dsn="root:pass@localhost/mydb" --batch=5000 large_file.parquet events
 ```
 
 ### Advanced Usage
@@ -66,10 +109,10 @@ any2parquet metrics.csv.zst            # → metrics.pk
 ```bash
 # Add extra compression (optional)
 any2parquet data.jsonl data.parquet.zst        # Parquet + Zstandard
-any2parquet data.msgpack data.pk.lz4           # Parquet + LZ4 (.pk extension)
+any2parquet data.msgpack data.parquet.lz4      # Parquet + LZ4
 
-# Custom output name (supports both .parquet and .pk extensions)
-any2parquet input.csv output_name.pk
+# Custom output name
+any2parquet input.csv output_name.parquet
 ```
 
 > ⚠️ **Note:** Parquet has built-in Snappy compression. Additional compression (.zst/.lz4/.gz) provides only ~10-15% size reduction with slower access times.
@@ -85,6 +128,7 @@ any2parquet input.csv output_name.pk
 | 📄 **JSONL** | `.jsonl`, `.ndjson` | JSON Lines - one JSON object per line |
 | 📊 **CSV** | `.csv`, `.tsv`, `.psv` | Comma/Tab/Pipe separated values |
 | 🔧 **MsgPack** | `.msgpack`, `.mp` | Binary serialization format |
+| 🗄️ **SQL Databases** | MySQL, PostgreSQL | Direct export via `--dsn` flag |
 
 ### Compression Support (Auto-Detected)
 
@@ -102,12 +146,71 @@ All input formats support automatic compression detection:
 
 ## ✨ Key Features
 
+### any2parquet - Universal Converter
 - ✅ **Universal Schema Support** - Works with ANY data structure
+- ✅ **SQL Database Export** - Direct export from MySQL and PostgreSQL
 - ✅ **Automatic Type Inference** - Detects int64, float64, string, bool
 - ✅ **Zero Configuration** - No schema files needed
 - ✅ **Compression Detection** - Automatically handles .gz, .zst, .lz4, etc.
+- ✅ **Stdout Support** - Pipe data with `-` argument
 - ✅ **Fast Processing** - Optimized for large datasets
 - ✅ **Industry Standard** - Compatible with all major data tools
+
+### parquet2db - Database Importer
+- ✅ **Auto Schema Creation** - Creates tables automatically if not exists
+- ✅ **Type Inference** - Intelligent column type detection (BIGINT, DOUBLE, TEXT, BOOLEAN)
+- ✅ **Batch Inserts** - High-performance bulk imports (configurable batch size)
+- ✅ **SQL Injection Protection** - Automatic value escaping
+- ✅ **Multi-Database** - MySQL and PostgreSQL support
+
+---
+
+## 🗄️ SQL Database Support
+
+### Export from Databases (any2parquet)
+
+Export data directly from MySQL or PostgreSQL to Parquet format:
+
+```bash
+# MySQL export
+any2parquet --dsn="user:pass@localhost" --sql="SELECT * FROM users" users.parquet
+any2parquet --dsn="root:pass@localhost" --table="mydb.orders" orders.parquet
+
+# PostgreSQL export
+any2parquet --driver=postgre --dsn="user:pass@host" --sql="SELECT * FROM logs" logs.parquet
+any2parquet --driver=postgre --dsn="user:pass@host" --table="public.events" events.parquet
+
+# To stdout for piping
+any2parquet --dsn="user:pass@host" --sql="SELECT * FROM users" - | duckdb
+```
+
+**DSN Format:**
+- MySQL: `user:password@tcp(host:3306)/database` or simplified `user:password@host`
+- PostgreSQL: `host=localhost port=5432 user=x password=y dbname=z sslmode=disable` or simplified `user:password@host`
+
+### Import to Databases (parquet2db)
+
+Import Parquet files to database tables with automatic schema creation:
+
+```bash
+# Import to MySQL
+parquet2db --dsn="root:pass@localhost/mydb" data.parquet users_table
+
+# Import to PostgreSQL
+parquet2db --driver=postgre --dsn="user:pass@host/mydb" data.parquet public.events
+
+# Custom batch size for large imports
+parquet2db --dsn="root:pass@localhost/mydb" --batch=5000 large_file.parquet events
+
+# Copy data between databases
+parquet2db --dsn="root:pass@localhost/mydb" --table="source.users" target_users
+```
+
+**Features:**
+- Automatically creates table if not exists
+- Infers column types from data (BIGINT, DOUBLE, TEXT, BOOLEAN)
+- Batch inserts for high performance (default: 1000 records)
+- Auto-escapes values to prevent SQL injection
 
 ---
 
@@ -141,6 +244,19 @@ any2parquet events.jsonl.zst warehouse/events.parquet
 
 # Query with Spark
 spark-sql -e "SELECT * FROM parquet.\`warehouse/events.parquet\` LIMIT 10"
+```
+
+### 🗄️ Database Migration
+Export and import between databases:
+```bash
+# Export from MySQL to Parquet
+any2parquet --dsn="user:pass@oldserver" --table="mydb.users" users.parquet
+
+# Import to PostgreSQL
+parquet2db --driver=postgre --dsn="user:pass@newserver/newdb" users.parquet public.users
+
+# Or pipe directly (future feature)
+# any2parquet --dsn="mysql://old" --table="users" - | parquet2db --dsn="postgres://new" - users
 ```
 
 ---
@@ -197,7 +313,7 @@ any2parquet products.csv products.parquet
 - **homebase-go-lib** - Optimized I/O and compression
 
 ### Keywords
-parquet converter, data format converter, jsonl to parquet, csv to parquet, msgpack to parquet, parquet tool, apache parquet, columnar format, data pipeline, etl tool, big data, data engineering, analytics, spark compatible, duckdb compatible, pandas compatible
+parquet converter, data format converter, jsonl to parquet, csv to parquet, msgpack to parquet, mysql to parquet, postgresql to parquet, database export, database import, sql to parquet, parquet to sql, parquet tool, apache parquet, columnar format, data pipeline, etl tool, big data, data engineering, analytics, database migration, spark compatible, duckdb compatible, pandas compatible
 
 ### Related Projects
 - [homebase-go-lib](https://github.com/parf/homebase-go-lib) - Core library with format converters
