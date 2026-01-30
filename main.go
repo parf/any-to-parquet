@@ -1,10 +1,8 @@
 package main
 
 import (
-	"encoding/csv"
 	"flag"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -12,13 +10,63 @@ import (
 	"github.com/parf/homebase-go-lib/fileiterator"
 )
 
+var (
+	sqlFlag    = flag.String("sql", "", "SQL query to execute")
+	tableFlag  = flag.String("table", "", "Table name (generates SELECT * FROM table)")
+	driverFlag = flag.String("driver", "mysql", "Database driver: mysql or postgre")
+	dsnFlag    = flag.String("dsn", "", "Database connection string")
+)
+
 func main() {
+	flag.Parse()
+
+	// Detect SQL mode
+	isSQLMode := *sqlFlag != "" || *tableFlag != "" || *dsnFlag != "" || *driverFlag != "mysql"
+
+	if isSQLMode {
+		handleSQLMode()
+	} else {
+		handleFileMode()
+	}
+}
+
+func handleFileMode() {
 	flag.Parse()
 
 	if flag.NArg() < 1 {
 		fmt.Fprintf(os.Stderr, "any2parquet - Convert any format to Parquet (RECOMMENDED) 🏆\n")
 		fmt.Fprintf(os.Stderr, "=============================================================\n\n")
-		fmt.Fprintf(os.Stderr, "Usage: %s <input-file> [output-file]\n\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "Usage:\n")
+		fmt.Fprintf(os.Stderr, "  File mode:  %s <input-file> [output-file|-]\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "  SQL mode:   %s --dsn=\"user:pass@host\" --sql=\"SELECT * FROM table\" [output-file|-]\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "              Use '-' for stdout, omit for auto-generated filename\n\n")
+
+		fmt.Fprintf(os.Stderr, "What is Parquet (.parquet)?\n")
+		fmt.Fprintf(os.Stderr, "  Parquet is a columnar storage format optimized for analytics.\n")
+		fmt.Fprintf(os.Stderr, "  Winner in benchmarks: Fastest overall (0.61s), excellent compression (44MB).\n")
+		fmt.Fprintf(os.Stderr, "  Best for: Everything - APIs, analytics, data warehouses.\n")
+		fmt.Fprintf(os.Stderr, "  Compatible with: Spark, DuckDB, Pandas, Arrow, all major data tools.\n\n")
+
+		fmt.Fprintf(os.Stderr, "=== SQL DATABASE SUPPORT ===\n\n")
+		fmt.Fprintf(os.Stderr, "Export directly from MySQL or PostgreSQL to Parquet format:\n\n")
+
+		fmt.Fprintf(os.Stderr, "Flags:\n")
+		fmt.Fprintf(os.Stderr, "  --sql=\"SELECT * FROM table\"  SQL query to execute\n")
+		fmt.Fprintf(os.Stderr, "  --table=\"schema.table\"       Table name (alternative to --sql)\n")
+		fmt.Fprintf(os.Stderr, "  --driver=mysql               Database driver: mysql or postgre (default: mysql)\n")
+		fmt.Fprintf(os.Stderr, "  --dsn=\"connection-string\"    Database connection string\n\n")
+
+		fmt.Fprintf(os.Stderr, "DSN Format:\n")
+		fmt.Fprintf(os.Stderr, "  MySQL:      user:password@tcp(host:3306)/database\n")
+		fmt.Fprintf(os.Stderr, "  PostgreSQL: host=localhost port=5432 user=myuser password=mypass sslmode=disable\n")
+		fmt.Fprintf(os.Stderr, "  Simplified: user:password@host (auto-expanded)\n\n")
+
+		fmt.Fprintf(os.Stderr, "Examples:\n")
+		fmt.Fprintf(os.Stderr, "  %s --dsn=\"root:pass@localhost\" --sql=\"SELECT * FROM users\" users.parquet\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "  %s --dsn=\"root:pass@localhost\" --table=\"mydb.users\" - | ./any2jsonl - | jq\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "  %s --driver=postgre --dsn=\"user:pass@pghost\" --table=\"public.orders\" orders.parquet\n\n", os.Args[0])
+
+		fmt.Fprintf(os.Stderr, "=== FILE CONVERSION ===\n\n")
 
 		fmt.Fprintf(os.Stderr, "Supported input formats (recognized extension → format):\n")
 		fmt.Fprintf(os.Stderr, "  - JSONL: JSON Lines, one JSON object per line → .jsonl\n")
@@ -32,28 +80,22 @@ func main() {
 		fmt.Fprintf(os.Stderr, "  .br  → Brotli (best compression, but very slow)\n")
 		fmt.Fprintf(os.Stderr, "  .xz  → XZ/LZMA (excellent compression, extremely slow - avoid)\n\n")
 
-		fmt.Fprintf(os.Stderr, "What is Parquet (.parquet / .pk)?\n")
-		fmt.Fprintf(os.Stderr, "  Parquet is a columnar storage format optimized for analytics.\n")
-		fmt.Fprintf(os.Stderr, "  Winner in benchmarks: Fastest overall (0.61s), excellent compression (44MB).\n")
-		fmt.Fprintf(os.Stderr, "  Best for: Everything - APIs, analytics, data warehouses.\n")
-		fmt.Fprintf(os.Stderr, "  Compatible with: Spark, DuckDB, Pandas, Arrow, all major data tools.\n")
-		fmt.Fprintf(os.Stderr, "  Extensions: .parquet or .pk (shorter alternative)\n\n")
-
 		fmt.Fprintf(os.Stderr, "⚠️  IMPORTANT: Parquet already has built-in Snappy compression!\n")
-		fmt.Fprintf(os.Stderr, "   Additional compression (.parquet.gz/.zst/.lz4 or .pk.gz/.zst/.lz4) is usually NOT needed.\n")
+		fmt.Fprintf(os.Stderr, "   Additional compression (.parquet.gz/.zst/.lz4) is usually NOT needed.\n")
 		fmt.Fprintf(os.Stderr, "   It only gives ~10-15%% smaller files but slower access.\n\n")
 
 		fmt.Fprintf(os.Stderr, "Examples:\n")
 		fmt.Fprintf(os.Stderr, "  %s data.jsonl.gz                      → data.parquet\n", os.Args[0])
-		fmt.Fprintf(os.Stderr, "  %s data.csv.zst output.pk             → output.pk (shorter extension)\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "  %s data.csv -                         → stdout\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "  %s data.csv.zst output.pq             → output.pq\n", os.Args[0])
 		fmt.Fprintf(os.Stderr, "  %s data.jsonl data.parquet.zst        → data.parquet.zst (with Zstd)\n", os.Args[0])
-		fmt.Fprintf(os.Stderr, "  %s data.msgpack data.pk.lz4           → data.pk.lz4 (with LZ4)\n\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "  %s data.msgpack data.parquet.lz4      → data.parquet.lz4 (with LZ4)\n\n", os.Args[0])
 
-		fmt.Fprintf(os.Stderr, "Output extensions (recognized extension → format):\n")
-		fmt.Fprintf(os.Stderr, "  .parquet / .pk     → Parquet with built-in Snappy compression\n")
-		fmt.Fprintf(os.Stderr, "  .parquet.zst / .pk.zst → Parquet + Zstandard (~15%% smaller, slower access)\n")
-		fmt.Fprintf(os.Stderr, "  .parquet.lz4 / .pk.lz4 → Parquet + LZ4 (~10%% smaller, slower access)\n")
-		fmt.Fprintf(os.Stderr, "  .parquet.gz  / .pk.gz  → Parquet + Gzip (~10-15%% smaller, slower access)\n")
+		fmt.Fprintf(os.Stderr, "Output compression (recognized extension → format):\n")
+		fmt.Fprintf(os.Stderr, "  .parquet     → Parquet with built-in Snappy compression\n")
+		fmt.Fprintf(os.Stderr, "  .parquet.zst → Parquet + Zstandard (~15%% smaller, slower access)\n")
+		fmt.Fprintf(os.Stderr, "  .parquet.lz4 → Parquet + LZ4 (~10%% smaller, slower access)\n")
+		fmt.Fprintf(os.Stderr, "  .parquet.gz  → Parquet + Gzip (~10-15%% smaller, slower access)\n")
 		fmt.Fprintf(os.Stderr, "  \n")
 		fmt.Fprintf(os.Stderr, "  ⚠️  Additional compression is usually NOT needed!\n")
 		fmt.Fprintf(os.Stderr, "  Parquet already has built-in Snappy compression.\n\n")
@@ -71,8 +113,7 @@ func main() {
 		fmt.Fprintf(os.Stderr, "  https://github.com/parf/homebase-go-lib/blob/main/benchmarks/serialization-benchmark-result.md\n\n")
 
 		fmt.Fprintf(os.Stderr, "Quick inspection with jq:\n")
-		fmt.Fprintf(os.Stderr, "  ./any2jsonl data.parquet | head -5 | jq\n")
-		fmt.Fprintf(os.Stderr, "  ./any2jsonl data.pk | head -5 | jq\n\n")
+		fmt.Fprintf(os.Stderr, "  ./any2jsonl data.parquet | head -5 | jq\n\n")
 
 		fmt.Fprintf(os.Stderr, "See also: ./any2jsonl (convert to human-readable JSONL format)\n")
 		os.Exit(1)
@@ -93,130 +134,167 @@ func main() {
 		outputFile += ".parquet"
 	}
 
-	fmt.Printf("Converting %s -> %s\n", inputFile, outputFile)
-
-	// Read all records from input (as generic map[string]any)
-	records, err := readInput(inputFile)
+	// Read all records from input (supports ANY schema)
+	records, err := fileiterator.ReadInput(inputFile)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error reading input: %v\n", err)
 		os.Exit(1)
 	}
 
-	fmt.Printf("Read %d records\n", len(records))
+	fmt.Fprintf(os.Stderr, "Read %d records\n", len(records))
 
-	// Write to Parquet (compression auto-detected from filename)
-	// Uses WriteParquetAny to support ANY schema
-	if err := fileiterator.WriteParquetAny(outputFile, records); err != nil {
-		fmt.Fprintf(os.Stderr, "Error writing Parquet: %v\n", err)
+	// If output is "-", write to stdout. Otherwise, write to file.
+	if outputFile == "-" {
+		// Write to stdout (using temp file since Parquet needs seekable writer)
+		tmpFile := "/tmp/any2parquet-" + fmt.Sprintf("%d", os.Getpid()) + ".parquet"
+		if err := fileiterator.WriteParquetAny(tmpFile, records); err != nil {
+			fmt.Fprintf(os.Stderr, "Error writing Parquet: %v\n", err)
+			os.Exit(1)
+		}
+		defer os.Remove(tmpFile)
+
+		// Copy to stdout
+		data, err := os.ReadFile(tmpFile)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error reading temp file: %v\n", err)
+			os.Exit(1)
+		}
+		if _, err := os.Stdout.Write(data); err != nil {
+			fmt.Fprintf(os.Stderr, "Error writing to stdout: %v\n", err)
+			os.Exit(1)
+		}
+	} else {
+		fmt.Fprintf(os.Stderr, "Converting %s -> %s\n", inputFile, outputFile)
+		// Write to Parquet file (compression auto-detected from filename)
+		if err := fileiterator.WriteParquetAny(outputFile, records); err != nil {
+			fmt.Fprintf(os.Stderr, "Error writing Parquet: %v\n", err)
+			os.Exit(1)
+		}
+		stat, _ := os.Stat(outputFile)
+		fmt.Fprintf(os.Stderr, "Written %s (%d bytes, %.2f MB)\n", outputFile, stat.Size(), float64(stat.Size())/1024/1024)
+	}
+}
+
+func handleSQLMode() {
+	// Validate required flags
+	if *dsnFlag == "" {
+		fmt.Fprintf(os.Stderr, "Error: --dsn is required for SQL queries\n")
 		os.Exit(1)
 	}
 
-	stat, _ := os.Stat(outputFile)
-	fmt.Printf("Written %s (%d bytes, %.2f MB)\n", outputFile, stat.Size(), float64(stat.Size())/1024/1024)
-}
-
-func readInput(filename string) ([]map[string]any, error) {
-	lower := strings.ToLower(filename)
-
-	if strings.Contains(lower, ".msgpack") {
-		return readMsgPack(filename)
-	} else if strings.Contains(lower, ".csv") {
-		return readCSV(filename)
-	} else if strings.Contains(lower, ".jsonl") {
-		return readJSONL(filename)
+	if *sqlFlag == "" && *tableFlag == "" {
+		fmt.Fprintf(os.Stderr, "Error: Either --sql or --table is required\n")
+		os.Exit(1)
 	}
 
-	return nil, fmt.Errorf("unsupported input format: %s", filename)
-}
-
-func readJSONL(filename string) ([]map[string]any, error) {
-	var records []map[string]any
-	err := fileiterator.IterateJSONL(filename, func(line map[string]any) error {
-		records = append(records, line)
-		return nil
-	})
-	return records, err
-}
-
-func readCSV(filename string) ([]map[string]any, error) {
-	var records []map[string]any
-
-	reader := fileiterator.FUOpen(filename)
-	defer reader.Close()
-
-	csvReader := csv.NewReader(reader)
-
-	// Detect delimiter
-	if strings.Contains(filename, ".tsv") {
-		csvReader.Comma = '\t'
-	} else if strings.Contains(filename, ".psv") {
-		csvReader.Comma = '|'
+	if *sqlFlag != "" && *tableFlag != "" {
+		fmt.Fprintf(os.Stderr, "Error: Cannot use both --sql and --table\n")
+		os.Exit(1)
 	}
 
-	// Read header to get field names
-	header, err := csvReader.Read()
+	// Generate SQL query from table if needed
+	sqlQuery := *sqlFlag
+	if sqlQuery == "" && *tableFlag != "" {
+		sqlQuery = fmt.Sprintf("SELECT * FROM %s", *tableFlag)
+	}
+
+	// Get optional output file from positional argument
+	outputFile := ""
+	if flag.NArg() > 0 {
+		outputFile = flag.Arg(0)
+	}
+
+	// Normalize DSN
+	dsn := normalizeDSN(*driverFlag, *dsnFlag)
+
+	fmt.Fprintf(os.Stderr, "Executing SQL query: %s\n", sqlQuery)
+
+	// Read from SQL
+	records, err := fileiterator.ReadSQLInput(*driverFlag, dsn, sqlQuery)
 	if err != nil {
-		return nil, err
+		fmt.Fprintf(os.Stderr, "Error executing SQL query: %v\n", err)
+		os.Exit(1)
 	}
 
-	for {
-		row, err := csvReader.Read()
-		if err == io.EOF {
-			break
+	fmt.Fprintf(os.Stderr, "Read %d records\n", len(records))
+
+	// If output file is "-" or empty, write to stdout. Otherwise, write to file.
+	if outputFile == "" || outputFile == "-" {
+		// Write to stdout (using temp file since Parquet needs seekable writer)
+		tmpFile := "/tmp/any2parquet-" + fmt.Sprintf("%d", os.Getpid()) + ".parquet"
+		if err := fileiterator.WriteParquetAny(tmpFile, records); err != nil {
+			fmt.Fprintf(os.Stderr, "Error writing Parquet: %v\n", err)
+			os.Exit(1)
 		}
+		defer os.Remove(tmpFile)
+
+		// Copy to stdout
+		data, err := os.ReadFile(tmpFile)
 		if err != nil {
-			return nil, err
+			fmt.Fprintf(os.Stderr, "Error reading temp file: %v\n", err)
+			os.Exit(1)
 		}
-
-		// Create map from header and row
-		record := make(map[string]any)
-		for i, fieldName := range header {
-			if i < len(row) {
-				// Try to infer type from value
-				value := row[i]
-				record[fieldName] = inferCSVType(value)
-			}
+		if _, err := os.Stdout.Write(data); err != nil {
+			fmt.Fprintf(os.Stderr, "Error writing to stdout: %v\n", err)
+			os.Exit(1)
 		}
-
-		records = append(records, record)
+	} else {
+		// Write to file
+		if err := fileiterator.WriteParquetAny(outputFile, records); err != nil {
+			fmt.Fprintf(os.Stderr, "Error writing Parquet: %v\n", err)
+			os.Exit(1)
+		}
+		stat, _ := os.Stat(outputFile)
+		fmt.Fprintf(os.Stderr, "Written %s (%d bytes, %.2f MB)\n", outputFile, stat.Size(), float64(stat.Size())/1024/1024)
 	}
-
-	return records, nil
 }
 
-// inferCSVType tries to infer the type of a CSV value
-func inferCSVType(value string) any {
-	// Try bool
-	if value == "true" {
-		return true
-	}
-	if value == "false" {
-		return false
+func normalizeDSN(driver, dsn string) string {
+	// If DSN contains "/" or "=" or "sslmode=", it's already in proper format
+	if strings.Contains(dsn, "/") || strings.Contains(dsn, "=") || strings.Contains(dsn, "sslmode=") {
+		return dsn
 	}
 
-	// Try int64
-	var i int64
-	if _, err := fmt.Sscanf(value, "%d", &i); err == nil && !strings.Contains(value, ".") {
-		return i
+	// Simplified format: "user:password@host"
+	if !strings.Contains(dsn, "@") {
+		return dsn // Return as-is if not in simplified format
 	}
 
-	// Try float64
-	var f float64
-	if _, err := fmt.Sscanf(value, "%f", &f); err == nil {
-		return f
+	parts := strings.Split(dsn, "@")
+	if len(parts) != 2 {
+		return dsn
 	}
 
-	// Default to string
-	return value
-}
+	userPass := parts[0]
+	host := parts[1]
 
-func readMsgPack(filename string) ([]map[string]any, error) {
-	var records []map[string]any
-	err := fileiterator.IterateMsgPack(filename, func(data any) error {
-		if m, ok := data.(map[string]any); ok {
-			records = append(records, m)
+	switch driver {
+	case "mysql":
+		// MySQL: user:password@tcp(host:3306)/
+		if !strings.Contains(host, ":") {
+			host = host + ":3306"
 		}
-		return nil
-	})
-	return records, err
+		return fmt.Sprintf("%s@tcp(%s)/", userPass, host)
+
+	case "postgre", "postgres", "postgresql":
+		// PostgreSQL: host=localhost port=5432 user=myuser password=mypass sslmode=disable
+		userParts := strings.Split(userPass, ":")
+		user := userParts[0]
+		pass := ""
+		if len(userParts) > 1 {
+			pass = userParts[1]
+		}
+
+		hostPort := strings.Split(host, ":")
+		hostName := hostPort[0]
+		port := "5432"
+		if len(hostPort) > 1 {
+			port = hostPort[1]
+		}
+
+		return fmt.Sprintf("host=%s port=%s user=%s password=%s sslmode=disable",
+			hostName, port, user, pass)
+	}
+
+	return dsn
 }
