@@ -1,5 +1,6 @@
 # Binaries
 any2parquet
+parquet2db
 *.exe
 *.dll
 *.so
